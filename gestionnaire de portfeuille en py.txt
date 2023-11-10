@@ -1,0 +1,79 @@
+# Importation des modules nécessaires
+import datetime
+import json
+import sqlite3
+import matplotlib.pyplot as plt
+
+# Définition des constantes
+DB_PATH = "database.sqlite3"
+
+# Définition des classes
+class Dépense:
+    def __init__(self, date, catégorie, montant):
+        self.date = date
+        self.catégorie = catégorie
+        self.montant = montant
+
+class Budget:
+    def __init__(self, nom, dépenses, budget):
+        self.nom = nom
+        self.dépenses = dépenses
+        self.budget = budget
+
+class Portefeuille:
+    def __init__(self):
+        self.db = sqlite3.connect(DB_PATH)
+        self.cursor = self.db.cursor()
+
+    def ajouter_dépense(self, dépense):
+        self.cursor.execute("INSERT INTO dépenses (date, catégorie, montant) VALUES (?, ?, ?)", (dépense.date, dépense.catégorie, dépense.montant))
+        self.db.commit()
+
+    def get_dépenses(self):
+        self.cursor.execute("SELECT * FROM dépenses")
+        return [Dépense(*row) for row in self.cursor.fetchall()]
+
+    def get_total(self):
+        self.cursor.execute("SELECT SUM(montant) FROM dépenses")
+        return self.cursor.fetchone()[0]
+
+    def get_dépenses_par_catégorie(self):
+        self.cursor.execute("SELECT catégorie, SUM(montant) AS montant FROM dépenses GROUP BY catégorie")
+        return [{"catégorie": row[0], "montant": row[1]} for row in self.cursor.fetchall()]
+
+    def get_dépenses_par_date(self):
+        self.cursor.execute("SELECT date, SUM(montant) AS montant FROM dépenses GROUP BY date")
+        return [{"date": row[0], "montant": row[1]} for row in self.cursor.fetchall()]
+
+    def ajouter_budget(self, budget):
+        self.cursor.execute("INSERT INTO budgets (nom, dépenses, budget) VALUES (?, ?, ?)", (budget.nom, budget.dépenses, budget.budget))
+        self.db.commit()
+
+    def get_budgets(self):
+        self.cursor.execute("SELECT * FROM budgets")
+        return [Budget(*row) for row in self.cursor.fetchall()]
+
+    def get_dépenses_par_budget(self):
+        self.cursor.execute("SELECT budgets.nom, catégories.nom, SUM(dépenses.montant) AS montant FROM dépenses JOIN budgets ON dépenses.budget = budgets.id JOIN catégories ON dépenses.catégorie = catégories.id GROUP BY budgets.nom, catégories.nom")
+        return [{"nom": row[0], "catégorie": row[1], "montant": row[2]} for row in self.cursor.fetchall()]
+
+    def get_total_par_budget(self):
+        self.cursor.execute("SELECT budgets.nom, SUM(dépenses.montant) AS montant FROM dépenses JOIN budgets ON dépenses.budget = budgets.id GROUP BY budgets.nom")
+        return [{"nom": row[0], "montant": row[1]} for row in self.cursor.fetchall()]
+
+    def ajouter_revenu(self, revenu):
+        self.cursor.execute("INSERT INTO revenus (date, montant) VALUES (?, ?)", (revenu.date, revenu.montant))
+        self.db.commit()
+
+    def get_revenus(self):
+        self.cursor.execute("SELECT * FROM revenus")
+        return [revenu for revenu in self.cursor.fetchall()]
+
+    def get_total_revenus(self):
+        self.cursor.execute("SELECT SUM(montant) FROM revenus")
+        return self.cursor.fetchone()[0]
+
+    def afficher_graphiques(self):
+        # Graphique des dépenses par catégorie
+        dépenses_par_catégorie = self.get_dépenses_par_catégorie()
+        plt.bar(dépenses_par_catégorie["catégorie"], dépenses_par_catégorie["montan
